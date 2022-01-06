@@ -1,0 +1,381 @@
+---
+title: "Chapter 8"
+author: "Alan T. Arnholt"
+date: 'Last compiled: `r format(Sys.time(), "%B %d, %Y at %X")`'
+output: bookdown::html_document2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA, warning = FALSE, message = FALSE, fig.align = "center")
+library(tidyverse)
+library(janitor)
+cereals <- read.csv("Cereals.csv") %>% clean_names()
+db2014 <- read.csv("Dirt_bikes_2014.csv") %>% clean_names()
+mod_cer <- lm(calories ~ sugars, data = cereals)
+```
+
+**Objectives:**
+
+I.    Examine residuals
+
+II.   Learn about leverage and influential observations
+
+III.  Straightening scatterplots
+
+
+# Examining Residuals
+
+Read in the data set `Penguins.csv` using `read.csv()` and store the results in `penguins`.  Use the `clean_names()` function from the `janitor` package on `penguins` to get consistent variable names.  From this point forward, we will make a habit of using `clean_names()` for consistent variable names in our data frames.
+
+```{r}
+library(janitor)  # consistent variable names
+penguins <- read.csv("Penguins.csv") %>% 
+  clean_names()
+knitr::kable(head(penguins))
+```
+
+Create a scatterplot of `dive_heart_rate` versus `duration_min` that resembles Figure 8.1 on page 240 of your text book.
+
+```{r}
+ggplot(data = penguins, aes(x = duration_min, y = dive_heart_rate)) + 
+  geom_point(color = "brown") + 
+  theme_bw() + 
+  labs(x = "Duration (minutes)", y = "Dive heart rate (beats per minute)")
+```
+**Note** the shape of the relationship in the scatterplot.
+
+Find the least squares line for regressing `dive_heart_rate` onto `duration_min` and store the results in `mod_pen`.
+
+```{r}
+mod_pen <- lm(dive_heart_rate ~ duration_min, data = penguins)
+summary(mod_pen)
+```
+
+Plot the residuals for `mod_pen` versus the `duration_min` that resembles Figure 8.2 on page 240 of your text book.  Start by creating a new data frame (`NDF`) based on `mod_pen` using the `augment()` function from the `broom` package.
+
+```{r}
+library(broom)
+NDF <- augment(mod_pen) %>% 
+  clean_names()
+knitr::kable(head(NDF))
+```
+
+
+```{r}
+ggplot(data = NDF, aes(x = duration_min, y = resid)) +
+  geom_point(color = "green4") + 
+  theme_bw() + 
+  geom_hline(yintercept = 0, lty = "dashed") + 
+  labs(x = "Duration (min)", y = "Residuals")
+```
+Fix the model by transforming the response (take the `log` of `dive_heart_rate`) and create a scatterplot of the transformed response variable versus `duration_min`.
+
+```{r}
+# Your Code Goes HERE
+
+
+
+
+
+```
+
+Find the least squares estimates using the transformed response and store the results in `mod_pen2`
+
+```{r}
+penguins <- penguins %>% 
+  mutate(log_dive_heart_rate = log(dive_heart_rate))
+mod_pen2 <- lm(log_dive_heart_rate ~ duration_min, data = penguins)
+summary(mod_pen2)
+```
+
+Plot the residuals of `mod_pen2` versus `duration_min`.
+
+```{r}
+# Your Code Goes HERE
+
+```
+
+Use `mod_pen2` to predict the heart rate of a penguin from a dive of 10 minutes.
+
+```{r}
+predict(mod_pen2, newdata = data.frame(duration_min = 10)) -> ans
+ans
+exp(ans)
+```
+
+Note: since `mod_pen2` is the `log` (which by default in R is the natural log (`ln`)), to get the answer back in the original units use `exp(ans)`.
+
+
+## Sifting Residuals for Groups
+
+Read in the data set `Cereals` and regress `calories` onto `sugars` and store the model in an object named `mod_cer`.
+
+```{r}
+# Your Code Goes HERE
+
+```
+
+Create a histogram of the residuals from `mod_cer` that resembles Figure 8.3 on page 241 of your text book.
+
+```{r}
+# Your Code Goes HERE
+
+```
+
+Using `mutate()` to create groups similar to Figure 8.4 on page 241 of your text book.
+
+```{r}
+NDF4 <- cereals %>%
+  mutate(resid = residuals(mod_cer), fitted = fitted(mod_cer)) %>% 
+  mutate(groups = ifelse(resid <= -25, "low", ifelse(resid <= 25, "med", "high")))
+NDF4 %>% 
+  filter(groups == "low") -> lowresid
+NDF4 %>% 
+  filter(groups == "high") -> highresid
+knitr::kable(lowresid)
+knitr::kable(highresid)
+ggplot(data = NDF4, aes(x = fitted, y = resid, color = groups)) + 
+  geom_point()+ 
+  theme_bw()
+```
+
+Create a scatterplot of `calories` versus `sugars` color coded by `groups`.  Add the least squares lines for the three different color coded groups to the scatterplot.
+
+
+```{r}
+# Your Code Goes HERE
+ggplot(data = NDF4, aes(x = sugars, y = calories, color = groups)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme_bw()
+```
+
+Explain the interaction and additive models below in class.
+
+```{r}
+mod_gro <- lm(calories ~ sugars*groups, data = NDF4)
+summary(mod_gro)
+# Note groups high is the base
+mod_gro$coefficients
+# LSE for high group
+b0h <- mod_gro$coefficients[1]
+b1h <- mod_gro$coefficients[2]
+c(b0h, b1h)
+# LSE for med group
+b0m <- mod_gro$coefficients[1] + mod_gro$coefficients[4]
+b1m <- mod_gro$coefficients[2] + mod_gro$coefficients[6]
+c(b0m, b1m)
+# LSE for low group
+b0l <- mod_gro$coefficients[1] + mod_gro$coefficients[3]
+b1l <- mod_gro$coefficients[2] + mod_gro$coefficients[5]
+c(b0l, b1l)
+ggplot(data = NDF4, aes(x = sugars, y = calories, color = groups)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme_bw() +
+  geom_abline(slope = b1h, intercept = b0h, size = 0.25) + 
+  geom_abline(slope = b1m, intercept = b0m, size = 0.25) + 
+  geom_abline(slope = b1l, intercept = b0l, size = 0.25)
+```
+
+## Parallel slopes model
+
+Load the `moderndive` package to use the `geom_parallel_slopes()` function to graph parallel lines.  Create a scatterplot of `calories` versus `sugars` color coded by `groups`.  Add parallel lines to the scatterplot.
+
+```{r}
+library(moderndive)
+ggplot(data = NDF4, aes(x = sugars, y = calories, color = groups)) + 
+  geom_point() + 
+  geom_parallel_slopes(se = FALSE) + 
+  theme_bw()
+```
+Explain the code below and how to get the intercepts and slopes for an additive model.
+
+```{r}
+# Parallel slope model
+mod_ps <- lm(calories ~ sugars + groups, data = NDF4)
+summary(mod_ps)
+# Note groups high is the base
+mod_ps$coefficients
+# LSE for high group
+b0h <- mod_ps$coefficients[1]
+b1h <- mod_ps$coefficients[2]
+c(b0h, b1h)
+# LSE for med group
+b0m <- mod_ps$coefficients[1] + mod_ps$coefficients[4]
+b1m <- mod_ps$coefficients[2]
+c(b0m, b1m)
+# LSE for low group
+b0l <- mod_ps$coefficients[1] + mod_ps$coefficients[3]
+b1l <- mod_ps$coefficients[2]
+c(b0l, b1l)
+ggplot(data = NDF4, aes(x = sugars, y = calories, color = groups)) + 
+  geom_point() + 
+  geom_parallel_slopes(se = FALSE) + 
+  theme_bw() +
+  geom_abline(slope = b1h, intercept = b0h, size = 0.25) + 
+  geom_abline(slope = b1m, intercept = b0m, size = 0.25) + 
+  geom_abline(slope = b1l, intercept = b0l, size = 0.25)
+```
+
+## Book Figure 8.5
+
+Recreate Figure 8.5 from page 242 of the text.
+
+```{r}
+cereals <- cereals %>% 
+  mutate(shelf = ifelse(shelf == 1, "bottom", ifelse(shelf == 2, "middle", "top")))
+ggplot(data = cereals, aes(x = sugars, y = calories, color = shelf)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme_bw() + 
+  labs(x = "Sugar (g)", y = "Calories")
+```
+
+## Example 8.1 --- Extrapolation: Reaching Beyond the Data
+
+Read in the `Marriage_age_2017.csv` data set and reproduce the analysis in Example 8.1.  Hint: use `mutate(time = ifelse(year <= 1940, "FP", ifelse(year <= 1979, "MP", "TP")))` to create a new variable `time` with three time periods.
+
+```{r}
+ma2017 <- read.csv("Marriage_age_2017.csv") %>% 
+  clean_names()
+ma2017 <- ma2017 %>% 
+  mutate(time = ifelse(year <= 1940, "FP", ifelse(year <= 1979, "MP", "TP")))
+# Your Code Goes HERE
+
+```
+
+## Outliers, Leverage, and Influence
+
+Read in the `Election_2000.csv` data and recreate Figure 8.9 from page 246 of your text.
+
+```{r}
+election2000 <- read.csv("Election_2000.csv") %>% 
+  clean_names()
+p1 <- ggplot(data = election2000, aes(x = nader, y = buchanan, color = county)) + 
+  geom_point() + 
+  theme_bw() + 
+  labs(x = "Nader (votes)", y = "Buchanan (votes)") + 
+  guides(color=FALSE) # remove legend
+p1
+library(plotly) # create interactive graph
+p2 <- ggplotly(p1)
+p2
+```
+
+```{r}
+election2000_PB <- election2000 %>% 
+  filter(county != "PALM BEACH")
+dim(election2000_PB)
+mod_no_pb <- lm(buchanan ~ nader, data = election2000_PB)
+dim(election2000)
+ggplot(data = election2000, aes(x = nader, y = buchanan)) + 
+  geom_point() + 
+  theme_bw() + 
+  labs(x = "Nader (votes)", y = "Buchanan (votes)") + 
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_abline(intercept = coefficients(mod_no_pb)[1], slope = coefficients(mod_no_pb)[2])
+```
+
+## Lurking Variables and Causation
+
+Read in the `Doctors_and_life_expectancy.csv` data set and recreate Figures 8.13 and 8.14 from page 249 of your text.
+
+```{r}
+dale <- read.csv("Doctors_and_life_expectancy.csv") %>% 
+  clean_names()
+names(dale)
+ggplot(data = dale, aes( x = sqrt_doctors_person, y = life_exp)) + 
+  geom_point(color = "brown") + 
+  theme_bw() + 
+  labs(x = expression(sqrt(Doctors/person)), y = "Life Expectancy (yr)", title = "Figure 8.13")
+```
+
+```{r}
+ggplot(data = dale, aes( x = sqrt_tv_person, y = life_exp)) + 
+  geom_point(color = "blue") + 
+  theme_bw() + 
+  labs(x = expression(sqrt(TVs/person)), y = "Life Expectancy (yr)", title = "Figure 8.14")
+```
+
+**Comment:** What should we do to increase life expectancy?
+
+
+## Example 8.2
+
+Read in the `Dirt_bikes_2014.csv` data set and store the result in `db2014`.  
+
+```{r}
+# Your Code Goes HERE
+
+```
+
+Create a scatterplot of `msrp` versus `displacement`.
+
+```{r}
+# Your Code Goes HERE
+
+```
+
+Regress `msrp` onto `displacement` and store the result in `mod_db`.  
+
+```{r}
+mod_db <- lm(msrp ~ displacement, data = db2014)
+summary(mod_db)
+```
+
+Create a scatterplot of the residuals for `mod_db` versus the fitted values using the values in `NDF5`.
+
+```{r}
+NDF5 <- augment(mod_db) %>% 
+  clean_names()
+# Your Code Goes HERE
+
+```
+
+Add the variable `displacement_third` to the `db2014` data frame by raising `displacement` to the 1/3 power.
+
+```{r}
+db2014 <- db2014 %>% 
+  mutate(displacement_third = displacement^(1/3))
+```
+
+Create a new data frame `NDF6` using the `filter()` function that contains only `Liquid` or `Air` cooled engines.
+
+```{r}
+NDF6 <- db2014 %>% 
+  filter(air_cooled == "Liquid" | air_cooled == "Air")
+```
+
+Create a graph similar to the second graph of page 251 of your text using the data in `NDF6`.
+
+```{r}
+# Your Code Goes HERE
+
+```
+
+Modify your previous code from the previous graph to create a scatterplot with parallel lines for the different engine types.
+
+```{r}
+# Your Code Goes HERE
+
+```
+
+## Re-Expression for Regression
+
+Read in the `Hand_dexterity.csv` data set and create a scatterplot of `time_sec` versus `age_yr` that resembles Figure 8.20 on page 254 of your text book.
+
+```{r}
+hd <- read.csv("Hand_dexterity.csv") %>% 
+  clean_names() %>% 
+  mutate(dominant = ifelse(dominant == 0, "Nondominant hand", "Dominant hand"))
+# Your Code Goes HERE
+
+```
+Create a scatterplot of `speed` versus `age_yr` that resembles Figure 8.21 on page 254 of your text book.
+
+```{r}
+# Your Code Goes HERE
+
+```
+
